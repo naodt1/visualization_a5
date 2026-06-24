@@ -35,12 +35,12 @@ vec3 phong_illumination(vec3 p, vec3 ray_dir, vec3 normal){
 	vec3 towards_light = normalize(light_position - p);
 
 	vec3 ambient = ambient_light_intensity * ambient_reflection_constant;
-	float lambertian = max(0.f, dot(normal, towards_light));
+	float lambertian = max(0.0, dot(normal, towards_light));
 	vec3 diffuse = diffuse_reflection_constant * lambertian * diffuse_light_intensity;
 	
 	vec3 view_dir = normalize(-ray_dir);
 	vec3 reflected_light_vector = reflect(-towards_light, normal);
-	float specular_coeff = pow( max(0.f, dot(view_dir, reflected_light_vector)), shininess_constant); 
+	float specular_coeff = pow(max(0.0, dot(view_dir, reflected_light_vector)), shininess_constant); 
 	vec3 specular = specular_reflection_constant * specular_coeff * specular_light_intensity;
 
 	return ambient + diffuse + specular;
@@ -85,7 +85,29 @@ vec2 intersect_box(vec3 orig, vec3 dir) {
 }
 
 bool inside_volume_bounds(vec3 p){
-	return all(greaterThanEqual(p, vec3(0.f))) && all(lessThanEqual(p, vec3(1.f)));
+	return all(greaterThanEqual(p, vec3(0.0))) && all(lessThanEqual(p, vec3(1.0)));
+}
+
+vec3 binary_search_iso_surface(vec3 p1, vec3 p2) {
+	vec3 lower_bound = p1;
+	vec3 upper_bound = p2;
+	vec3 mid_point = upper_bound;
+	float lower_value = sample_data_volume(lower_bound);
+
+	for (int iteration = 0; iteration < 10; ++iteration) {
+		mid_point = (lower_bound + upper_bound) * 0.5;
+		float mid_value = sample_data_volume(mid_point);
+
+		if ((lower_value <= iso_value && mid_value > iso_value) ||
+		    (lower_value >= iso_value && mid_value < iso_value)) {
+			upper_bound = mid_point;
+		} else {
+			lower_bound = mid_point;
+			lower_value = mid_value;
+		}
+	}
+
+	return mid_point;
 }
 
 void main(void) { 
@@ -110,6 +132,7 @@ void main(void) {
 
 	// YOUR CODE HERE...
 	// 1. store the data value at the previous sample point
+	vec3 last_p = p;
 	float last_val = sample_data_volume(p);
 
 	// 2. traverse the volume
@@ -122,7 +145,11 @@ void main(void) {
 		if ((last_val <= iso_value && current_val > iso_value) ||
 		    (last_val >= iso_value && current_val < iso_value)) {
 
-			// 5. iso-surface found — assign a flat color and stop traversal
+			if (binary_search_active) {
+				p = binary_search_iso_surface(last_p, p);
+			}
+
+			// 5. iso-surface found - assign a flat color and stop traversal
 			if (illumination_active) {  // check for active illumination and call phong illumination
 				vec3 gradient = estimate_gradient(p);
 				vec3 illuminated = phong_illumination(p, ray_dir, gradient);
@@ -134,6 +161,7 @@ void main(void) {
 		}
 
 		// 6. update last value for the next iteration
+		last_p = p;
 		last_val = current_val;
 
 		// advance the ray
