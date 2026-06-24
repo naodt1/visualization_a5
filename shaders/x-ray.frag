@@ -26,7 +26,7 @@ vec2 intersect_box(vec3 orig, vec3 dir) {
 }
 
 bool inside_volume_bounds(vec3 p){
-	return all(greaterThanEqual(p, vec3(0.f))) && all(lessThanEqual(p, vec3(1.f)));
+	return all(greaterThanEqual(p, vec3(0.0))) && all(lessThanEqual(p, vec3(1.0)));
 }
 
 void main(void) { 
@@ -52,20 +52,15 @@ void main(void) {
     // take tiny step in ray direction to make sure we are inside the volume bounds
 	p += ray_dir * 0.00001;
 
-		int num_samples = 0;
-float intensity = 0.f;
+    int num_samples = 0;
+    float intensity = 0.0;
 
 	while (inside_volume_bounds(p)){
-++num_samples;
+	    ++num_samples;
+		intensity += sample_data_volume(p);
 		p += ray_dir * sampling_distance;
-	
     }
-
-	float sample_data_volume (vec3 p){
-return texture(volume, p).x;
-}
-
-	color = vec4(1.0, 0.0, 0.0, 1.0);
-
-
+	
+    float avg = num_samples > 0 ? intensity / float(num_samples) : 0.0;
+    color = vec4(vec3(avg * 4.0), 1.0);
 }
