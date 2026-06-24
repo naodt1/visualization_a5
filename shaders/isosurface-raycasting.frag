@@ -46,7 +46,29 @@ vec3 phong_illumination(vec3 p, vec3 ray_dir, vec3 normal){
 	return ambient + diffuse + specular;
 }
 
+// Task 2a: Gradient estimation using central differences
+vec3 estimate_gradient(vec3 q) {
+	// Step size: one voxel in each dimension
+    vec3 step = 1.0 / vec3(volume_dims);
 
+    //Central difference method to estimate the gradient
+	float vpos_x = sample_data_volume(q + vec3(step.x, 0.0, 0.0));
+    float vneg_x = sample_data_volume(q - vec3(step.x, 0.0, 0.0));
+
+    float vpos_y = sample_data_volume(q + vec3(0.0, step.y, 0.0));
+    float vneg_y = sample_data_volume(q - vec3(0.0, step.y, 0.0));
+
+    float vpos_z = sample_data_volume(q + vec3(0.0, 0.0, step.z));
+    float vneg_z = sample_data_volume(q - vec3(0.0, 0.0, step.z));
+
+    vec3 gradient = vec3(
+		(vpos_x - vneg_x) / (2.0 * step.x),
+        (vpos_y - vneg_y) / (2.0 * step.y),
+        (vpos_z - vneg_z) / (2.0 * step.z)
+	);
+	
+	return gradient;
+}
 
 
 vec2 intersect_box(vec3 orig, vec3 dir) {
@@ -87,4 +109,34 @@ void main(void) {
 
 
 	// YOUR CODE HERE...
+	// 1. store the data value at the previous sample point
+	float last_val = sample_data_volume(p);
+
+	// 2. traverse the volume
+	while (inside_volume_bounds(p)) {
+
+		// 3. sample the scalar value at the current point
+		float current_val = sample_data_volume(p);
+
+		// 4. check if the iso-value lies between the last and current sample values
+		if ((last_val <= iso_value && current_val > iso_value) ||
+		    (last_val >= iso_value && current_val < iso_value)) {
+
+			// 5. iso-surface found — assign a flat color and stop traversal
+			if (illumination_active) {  // check for active illumination and call phong illumination
+				vec3 gradient = estimate_gradient(p);
+				vec3 illuminated = phong_illumination(p, ray_dir, gradient);
+				color = vec4(illuminated, 1.0);
+			} else {
+				color = vec4(1.0, 0.0, 0.0, 1.0);
+			}
+			break;
+		}
+
+		// 6. update last value for the next iteration
+		last_val = current_val;
+
+		// advance the ray
+		p += ray_dir * sampling_distance;
+	}
 }
